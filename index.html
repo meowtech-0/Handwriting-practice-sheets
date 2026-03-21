@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Custom Handwriting Practice Sheets</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Fredoka+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="worksheet.css">
+</head>
+<body>
+
+<header>
+  <div class="logo-badge">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#6B8BE0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+  </div>
+  <div>
+    <h1>Custom Handwriting Practice Sheets</h1>
+  </div>
+  <div class="header-deco"></div>
+</header>
+
+<div class="app">
+
+<div class="settings">
+
+  <div class="sec">
+    <div class="stitle"><span class="sicon"></span> Worksheet Design</div>
+    <div class="dgrid" id="dGrid"></div>
+  </div>
+
+  <div class="sec">
+    <div class="stitle"><span class="sicon"></span> Practice Text</div>
+    <div class="card">
+      <div class="field"><label>Text to practice</label>
+        <textarea id="iText" placeholder="The quick brown fox jumps over the lazy dog.&#10;&#10;CJK: 永 水 山 日 月 火 木 金 土 人"></textarea>
+      </div>
+      <div class="field" style="margin:0"><label>Worksheet title <span class="opt">optional</span></label>
+        <input type="text" id="iTitle" placeholder="e.g. Week 3 Practice">
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="stitle"><span class="sicon"></span> Guide Font</div>
+    <div class="fdrop" id="fdrop" onclick="document.getElementById('finput').click()">
+      <div class="ficon">Aa</div>
+      <div><p>Drop a font file here</p><small>.ttf · .otf · .woff · .woff2</small></div>
+      <button class="bbtn" onclick="event.stopPropagation();document.getElementById('finput').click()">Browse</button>
+      <input type="file" id="finput" accept=".ttf,.otf,.woff,.woff2" hidden>
+    </div>
+    <div class="floaded" id="floaded">
+      <span class="fbadge" id="fbadge">Font</span>
+      <span class="fpreview" id="fpreview">Aa Bb 가 나 永</span>
+      <button class="xclear" onclick="clearFont()">✕</button>
+    </div>
+    <div class="fwarn" id="fwarn"></div>
+
+    <div class="r2" style="margin-top:0.65rem">
+      <div class="field" style="margin:0"><label>Fallback style</label>
+        <select id="iFallback" onchange="upd()">
+          <option value="sans">Sans-serif</option>
+          <option value="serif">Serif</option>
+          <option value="mono">Monospace</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0"><label>Guide opacity</label>
+        <select id="iOpacity" onchange="upd()">
+          <option value="0.14">Very light</option>
+          <option value="0.28" selected>Light</option>
+          <option value="0.45">Medium</option>
+          <option value="0.65">Strong</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec" id="optSec">
+    <div class="stitle"><span class="sicon"></span> Design Options</div>
+    <div class="opanel" id="optPanel"></div>
+  </div>
+
+  <div class="sec">
+    <div class="stitle"><span class="sicon"></span> Colors</div>
+    <div class="card">
+      <div class="r2" style="margin-bottom:0.85rem">
+        <div class="colorpick-wrap">
+          <label>Ruling Color</label>
+          <div class="colorinput-wrap">
+            <input type="color" id="ruleColorPicker" value="#9BA8B5" oninput="syncColor('rule',this.value)">
+            <input type="text" id="ruleColorHex" value="#9BA8B5" oninput="syncColor('rule',this.value)" maxlength="7">
+          </div>
+        </div>
+        <div class="colorpick-wrap">
+          <label>Paper Color</label>
+          <div class="colorinput-wrap">
+            <input type="color" id="paperColorPicker" value="#FFFBF9" oninput="syncColor('paper',this.value)">
+            <input type="text" id="paperColorHex" value="#FFFBF9" oninput="syncColor('paper',this.value)" maxlength="7">
+          </div>
+        </div>
+      </div>
+      <label>Paper presets</label>
+      <div class="paper-presets" id="paperPresets"></div>
+      <div style="margin-top:0.85rem;padding-top:0.85rem;border-top:1.5px solid #F0EBF5">
+        <div class="toglist">
+          <div class="togrow"><span style="font-weight:700">Notebook frame style</span><button class="tog" id="tFrame" onclick="tc(this)"></button></div>
+        </div>
+        <div id="frameColorWrap" style="margin-top:0.65rem;display:none">
+          <div class="r2">
+            <div class="colorpick-wrap">
+              <label>Frame Color</label>
+              <div class="colorinput-wrap">
+                <input type="color" id="frameColorPicker" value="#8EC5BB" oninput="syncColor('frame',this.value)">
+                <input type="text" id="frameColorHex" value="#8EC5BB" oninput="syncColor('frame',this.value)" maxlength="7">
+              </div>
+            </div>
+            <div class="field" style="margin:0"><label>Frame size</label>
+              <select id="iFrameSize" onchange="upd()">
+                <option value="18">Thin</option>
+                <option value="28" selected>Medium</option>
+                <option value="42">Thick</option>
+              </select>
+            </div>
+          </div>
+          <label style="margin-top:0.6rem">Frame presets</label>
+          <div class="paper-presets" id="framePresets"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="stitle"><span class="sicon"></span> Page Settings</div>
+    <div class="card">
+      <label style="margin-bottom:.45rem">Orientation</label>
+      <div class="orient-btns" style="margin-bottom:0.85rem">
+        <button class="orient-btn on" id="oBtnPortrait" onclick="setOrient('portrait')">
+          <svg width="14" height="18" viewBox="0 0 14 18" fill="none"><rect x="1" y="1" width="12" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/></svg>
+          Portrait
+        </button>
+        <button class="orient-btn" id="oBtnLandscape" onclick="setOrient('landscape')">
+          <svg width="18" height="14" viewBox="0 0 18 14" fill="none"><rect x="1" y="1" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/></svg>
+          Landscape
+        </button>
+      </div>
+      <div class="r2" style="margin-bottom:.7rem">
+        <div class="field" style="margin:0"><label>Paper size</label>
+          <select id="iPaper" onchange="upd()">
+            <option value="letter">US Letter</option>
+            <option value="a4">A4</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"><label>Copies</label>
+          <select id="iCopies" onchange="upd()">
+            <option value="1" selected>1 copy</option>
+            <option value="2">2 copies</option>
+            <option value="3">3 copies</option>
+            <option value="4">4 copies</option>
+            <option value="5">5 copies</option>
+            <option value="10">10 copies</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:.7rem"><label>Total pages to print</label>
+        <div id="pageCount" style="background:var(--lav3);border:2px solid #DDD0E8;border-radius:var(--r2);padding:.46rem .75rem;font-size:.88rem;font-weight:700;color:var(--ink2)">— pages</div>
+      </div>
+      <div class="toglist">
+        <div class="togrow"><span>Show guide text</span><button class="tog on" id="tGuide" onclick="tc(this)"></button></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="right">
+  <div class="prevcard">
+    <div class="pl">Preview</div>
+    <canvas id="pc"></canvas>
+  </div>
+  <button class="gbtn" onclick="genPDF()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+    ✦ Download PDF
+  </button>
+  <p class="priv">Runs in your browser · nothing stored</p>
+</div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="worksheet.js"></script>
+</body>
+</html>

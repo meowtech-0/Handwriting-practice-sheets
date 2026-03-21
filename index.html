@@ -54,7 +54,6 @@
       <button class="xclear" onclick="clearFont()">✕</button>
     </div>
     <div class="fwarn" id="fwarn"></div>
-
     <div class="r2" style="margin-top:0.65rem">
       <div class="field" style="margin:0"><label>Fallback style</label>
         <select id="iFallback" onchange="upd()">
@@ -69,6 +68,20 @@
           <option value="0.28" selected>Light</option>
           <option value="0.45">Medium</option>
           <option value="0.65">Strong</option>
+        </select>
+      </div>
+    </div>
+    <div class="r2" style="margin-top:0.55rem">
+      <div class="field" style="margin:0"><label>Weight</label>
+        <select id="iFontWeight" onchange="upd()">
+          <option value="normal" selected>Normal</option>
+          <option value="bold">Bold</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0"><label>Style</label>
+        <select id="iFontStyle" onchange="upd()">
+          <option value="normal" selected>Normal</option>
+          <option value="italic">Italic</option>
         </select>
       </div>
     </div>
@@ -169,7 +182,7 @@
     </div>
   </div>
 
-</div>
+</div><!-- /settings -->
 
 <div class="right">
   <div class="prevcard">
@@ -183,7 +196,7 @@
   <p class="priv">Runs in your browser · nothing stored</p>
 </div>
 
-</div>
+</div><!-- /app -->
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="worksheet.js"></script>

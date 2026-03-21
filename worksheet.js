@@ -39,7 +39,6 @@ function buildSegments(rawText, maxWidth, measureFn) {
     const words = para.split(/\s+/).filter(Boolean);
     let cur = '';
     for (const w of words) {
-      // If a single word is wider than the line, break it char by char
       if (measureFn(w) > maxWidth) {
         if (cur) { out.push(cur); cur = ''; }
         let chunk = '';
@@ -229,14 +228,20 @@ function ion(id){const e=document.getElementById(id);return e?e.classList.contai
 async function loadFont(file){
   const name=file.name.replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9_-]/g,'_');
   const cssName='WS_'+Date.now();
-  const base64=await new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.readAsDataURL(file);});
   const ab=await file.arrayBuffer();
+  const base64=await new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.readAsDataURL(file);});
   try{const ff=new FontFace(cssName,ab);await ff.load();document.fonts.add(ff);}catch(e){}
-  S.font={name,base64,css:cssName,fname:file.name};
-  document.getElementById('fbadge').textContent=name;
+  const magic=new Uint8Array(ab,0,4);
+  const isCFF=(magic[0]===0x4F&&magic[1]===0x54&&magic[2]===0x54&&magic[3]===0x4F);
+  S.font={name,base64,css:cssName,fname:file.name,isCFF};
+  document.getElementById('fbadge').textContent=name+(isCFF?' (OTF)':'');
   document.getElementById('fpreview').style.fontFamily=`'${cssName}',sans-serif`;
   document.getElementById('fpreview').textContent='Aa Bb 가 나 永 水';
   document.getElementById('floaded').style.display='flex';
+  if(isCFF){
+    const badge=document.getElementById('fbadge');
+    badge.title='CFF/OTF font — will be rendered as image in PDF (fully supported)';
+  }
   cjkWarn();upd();
 }
 function clearFont(){
@@ -267,9 +272,12 @@ document.getElementById('finput').addEventListener('change',e=>{if(e.target.file
 function h2r(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
 function blend(fg,bg,a){return fg.map((v,i)=>Math.round(v*a+bg[i]*(1-a)));}
 function cssFont(sz){
-  if(S.font)return`${sz}px '${S.font.css}',sans-serif`;
+  const weight=document.getElementById('iFontWeight')?.value||'normal';
+  const style=document.getElementById('iFontStyle')?.value||'normal';
+  const prefix=(style==='italic'?'italic ':'')+(weight==='bold'?'bold ':'');
+  if(S.font)return`${prefix}${sz}px '${S.font.css}',sans-serif`;
   const f=document.getElementById('iFallback').value;
-  return(f==='serif'?`italic ${sz}px Georgia,serif`:f==='mono'?`${sz}px monospace`:`${sz}px sans-serif`);
+  return(f==='serif'?`${prefix}${sz}px Georgia,serif`:f==='mono'?`${prefix}${sz}px monospace`:`${prefix}${sz}px sans-serif`);
 }
 function cvsInner(ctx,bx,by,bs,cs,rr,rg,rb,pc,alpha){
   if(cs==='none')return;
@@ -416,8 +424,6 @@ function prevLined(ctx,x,y,w,h,rc,pc,op,rawTxt,sc){
   const fontSize=lh;
   const fontStr=cssFont(fontSize);
 
-  // Build segments: measure with the exact font string being used
-  // Use a generous margin (12px) so even if font metrics differ slightly, text fits
   ctx.font=fontStr;
   const maxSegW=w-12;
   const segs=showGuide ? cvsSegments(ctx,rawTxt,maxSegW) : [''];
@@ -576,7 +582,6 @@ function prevDot(ctx,x,y,w,h,rc,pc,op,rawTxt,sc){
       for(let gx=x+sp/2;gx<x+w;gx+=sp){ctx.beginPath();ctx.arc(gx,gy,ds,0,Math.PI*2);ctx.fill();}
   }
 }
-// ── Font warning modal removed — using inline warning only ──
 
 async function genPDF(){
   const btn=document.querySelector('.gbtn');
@@ -598,27 +603,59 @@ async function genPDF(){
     const B=(fg,bg,a)=>fg.map((v,i)=>Math.round(v*a+bg[i]*(1-a)));
     const copies=parseInt(document.getElementById('iCopies')?.value||1);
 
-    // ── Font setup ──
     let fn='helvetica',fs='normal';
-    if(S.font){
+    const fontWeight=document.getElementById('iFontWeight')?.value||'normal';
+    const fontStyle=document.getElementById('iFontStyle')?.value||'normal';
+    const pdfStyle=(fontWeight==='bold'&&fontStyle==='italic')?'bolditalic'
+                  :(fontWeight==='bold')?'bold'
+                  :(fontStyle==='italic')?'italic'
+                  :'normal';
+    const needsStyleRender=S.font&&(fontStyle==='italic'||fontWeight==='bold');
+    const useCFFRender=(S.font&&S.font.isCFF)||needsStyleRender;
+
+    if(S.font&&!useCFFRender){
       try{
-        doc.addFileToVFS(S.font.fname,S.font.base64);
-        doc.addFont(S.font.fname,'WScustom','normal');
+        const pdfFname=S.font.fname.replace(/\.(otf|woff2?)$/i,'.ttf');
+        doc.addFileToVFS(pdfFname,S.font.base64);
+        doc.addFont(pdfFname,'WScustom','normal');
         fn='WScustom';
+        fs='normal';
       } catch(e){console.warn('Custom font err:',e);}
-    } else if(hasNonAscii(rawTxt)||hasNonAscii(wtitle)){
+    } else if(!S.font&&(hasNonAscii(rawTxt)||hasNonAscii(wtitle))){
       btn.innerHTML=origLabel;btn.disabled=false;
       const w=document.getElementById('fwarn');
       w.scrollIntoView({behavior:'smooth',block:'center'});
       w.style.transition='all .1s';
       w.style.transform='scale(1.03)';
       w.style.boxShadow='0 0 0 3px #B05A30';
-      setTimeout(()=>{w.style.transform='';w.style.boxShadow='';},600);
+      setTimeout(()=>{w.style.transform='',w.style.boxShadow='';},600);
       return;
-    } else {
+    } else if(!S.font){
       const fb=document.getElementById('iFallback').value;
-      if(fb==='serif'){fn='times';fs='italic';}
-      else if(fb==='mono')fn='courier';
+      if(fb==='serif'){fn='times';}
+      else if(fb==='mono'){fn='courier';}
+      else{fn='helvetica';}
+      fs=pdfStyle==='bolditalic'?'bolditalic':pdfStyle==='bold'?'bold':pdfStyle==='italic'?'italic':'normal';
+    }
+
+    function canvasTextImage(text,fontSizePt,r,g,b,alpha,maxWidthPt,scalePx){
+      const sc=scalePx||3;
+      const w=Math.ceil(maxWidthPt*sc),h=Math.ceil(fontSizePt*sc*1.4);
+      const cv=document.createElement('canvas');
+      cv.width=w;cv.height=h;
+      const ctx=cv.getContext('2d');
+      ctx.clearRect(0,0,w,h);
+      ctx.fillStyle=`rgba(${r},${g},${b},${alpha})`;
+      ctx.font=`${fontSizePt*sc}px '${S.font.css}',sans-serif`;
+      ctx.textBaseline='alphabetic';
+      ctx.fillText(text,2,fontSizePt*sc);
+      return{dataUrl:cv.toDataURL('image/png'),wPt:maxWidthPt,hPt:fontSizePt*1.4};
+    }
+
+    function pdfCFFText(text,fontSizePt,x,baseline,maxWidth,r,g,b,alpha){
+      if(!text)return;
+      const img=canvasTextImage(text,fontSizePt,r,g,b,alpha,maxWidth);
+      doc.addImage(img.dataUrl,'PNG',x,baseline-fontSizePt,img.wPt,img.hPt,'','FAST');
     }
 
     btn.innerHTML='⏳ Building PDF…';
@@ -664,13 +701,18 @@ async function genPDF(){
     if(totalPages>1){doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(...B(rc,pc,.4));doc.text(`${pg} / ${totalPages}`,W-IMR,H-framePad-20,{align:'right'});}
     return y;
   }
-    // ── Wrap per-design drawing so we can repeat for copies ──
     function drawOneCopy(isFirst){
       const d=S.design;
       if(d==='wide'){
         doc.setFont(fn,fs);doc.setFontSize(S.lineH);
-        // Use jsPDF's own splitTextToSize — reliable regardless of font
-        const allLines=showGuide ? doc.splitTextToSize(rawTxt,icW-8) : [''];
+        let allLines;
+        if(useCFFRender){
+          const tmp=document.createElement('canvas').getContext('2d');
+          tmp.font=`${S.lineH}px '${S.font.css}',sans-serif`;
+          allLines=showGuide?buildSegments(rawTxt,icW-8,s=>tmp.measureText(s).width):[''];
+        } else {
+          allLines=showGuide?doc.splitTextToSize(rawTxt,icW-8):[''];
+        }
         const lh=S.lineH,reps=S.reps;
         const showMid=ion('tMid'),showTop=ion('tTop'),showDesc=ion('tDesc');
         const descH=lh*0.4;
@@ -694,9 +736,14 @@ async function genPDF(){
               doc.setDrawColor(...B(rc,pc,.72));doc.setLineWidth(.65);doc.line(IML,ry+lh,IML+icW,ry+lh);
               if(showDesc){doc.setDrawColor(...B(rc,pc,.18));doc.setLineWidth(.28);doc.line(IML,ry+lh+descH,IML+icW,ry+lh+descH);}
               if(r===0&&showGuide&&seg){
-                doc.setFont(fn,fs);doc.setFontSize(lh);
-                doc.setTextColor(...B(rc,pc,op));
-                doc.text(seg,IML+2,ry+lh);
+                if(useCFFRender){
+                  const[gr,gg,gb]=B(rc,pc,op);
+                  pdfCFFText(seg,lh,IML+2,ry+lh,icW-4,gr,gg,gb,op);
+                } else {
+                  doc.setFont(fn,fs);doc.setFontSize(lh);
+                  doc.setTextColor(...B(rc,pc,op));
+                  doc.text(seg,IML+2,ry+lh);
+                }
               }
             }
             cy+=setH;
@@ -723,10 +770,17 @@ async function genPDF(){
           for(let j=0;j<pageRows;j++)for(let i=0;i<cols;i++)pdfInner(IML+i*cs,sy+j*cs,cs,S.gridCross,.3);
           doc.setDrawColor(...B(rc,pc,.62));doc.setLineWidth(lw);
           if(showGuide){
-            doc.setFont(fn,'normal');doc.setFontSize(cs*.6);doc.setTextColor(...B(rc,pc,op));
+            if(!useCFFRender){doc.setFont(fn,'normal');doc.setFontSize(cs*.6);doc.setTextColor(...B(rc,pc,op));}
             for(let j=0;j<pageRows;j++)for(let i=0;i<cols;i++){
               const ch=chars[ci%chars.length];ci++;
-              if(ch.trim())doc.text(ch,IML+i*cs+cs*.5,sy+j*cs+cs*.72,{align:'center'});
+              if(!ch.trim())continue;
+              const cx=IML+i*cs,cy=sy+j*cs;
+              if(useCFFRender){
+                const[gr,gg,gb]=B(rc,pc,op);
+                pdfCFFText(ch,cs*.6,cx,cy+cs*.72,cs,gr,gg,gb,op);
+              } else {
+                doc.text(ch,cx+cs*.5,cy+cs*.72,{align:'center'});
+              }
             }
           }
         }
@@ -754,9 +808,14 @@ async function genPDF(){
               doc.setDrawColor(...B(rc,pc,.8));doc.setLineWidth(.75);
               if(showGuide&&chars.length){
                 const ch=chars[ci%chars.length];ci++;
-                doc.setFont(fn,'normal');doc.setFontSize(bs*.62);
-                doc.setTextColor(...B(rc,pc,op));
-                doc.text(ch,bx+bs*.5,by+bs*.73,{align:'center'});
+                if(useCFFRender){
+                  const[gr,gg,gb]=B(rc,pc,op);
+                  pdfCFFText(ch,bs*.62,bx,by+bs*.73,bs,gr,gg,gb,op);
+                } else {
+                  doc.setFont(fn,'normal');doc.setFontSize(bs*.62);
+                  doc.setTextColor(...B(rc,pc,op));
+                  doc.text(ch,bx+bs*.5,by+bs*.73,{align:'center'});
+                }
               }
             }
             ry+=bs;
@@ -778,21 +837,16 @@ async function genPDF(){
           for(let gy=sy;gy+bs<=sy+avH;gy+=bs){
             for(let i=0;i<cols;i++){
               const bx=IML+i*bs;
-              // Parallelogram: tl,tr,br,bl
               const tlx=bx+sk,tly=gy;
               const trx=bx+bs+sk,try_=gy;
               const brx=bx+bs,bry=gy+bs;
               const blx=bx,bly=gy+bs;
-              // Draw outer parallelogram
               doc.setDrawColor(...B(rc,pc,.82));doc.setLineWidth(.75);
               doc.lines([[trx-tlx,0],[brx-trx,bry-try_],[blx-brx,0]],tlx,tly,null,null,'S',true);
-              // Inner guides
               if(cs!=='none'){
                 doc.setLineDashPattern([2,3],0);doc.setDrawColor(...B(rc,pc,.28));doc.setLineWidth(.4);
                 if(cs==='cross'||cs==='both'){
-                  // Vertical mid (skewed)
                   doc.line((tlx+trx)/2,tly,(blx+brx)/2,bly);
-                  // Horizontal mid
                   doc.line((tlx+blx)/2,(tly+bly)/2,(trx+brx)/2,(try_+bry)/2);
                 }
                 if(cs==='diagonal'||cs==='both'){
@@ -801,14 +855,18 @@ async function genPDF(){
                 }
                 doc.setLineDashPattern([],0);
               }
-              // Guide char
               if(showGuide&&chars.length){
                 const ch=chars[ci%chars.length];ci++;
                 const cx=(tlx+trx+blx+brx)/4;
                 const cy=(tly+try_+bly+bry)/4+bs*.18;
-                doc.setFont(fn,'normal');doc.setFontSize(bs*.6);
-                doc.setTextColor(...B(rc,pc,op));
-                doc.text(ch,cx,cy,{align:'center'});
+                if(useCFFRender){
+                  const[gr,gg,gb]=B(rc,pc,op);
+                  pdfCFFText(ch,bs*.6,cx-bs*.5,cy,bs,gr,gg,gb,op);
+                } else {
+                  doc.setFont(fn,'normal');doc.setFontSize(bs*.6);
+                  doc.setTextColor(...B(rc,pc,op));
+                  doc.text(ch,cx,cy,{align:'center'});
+                }
               }
             }
           }
@@ -817,7 +875,14 @@ async function genPDF(){
         const sp=S.dotSp,ds=S.dotSz;
         const zoneH=sp*4;
         doc.setFont(fn,fs);doc.setFontSize(sp*0.65);
-        const allLines=showGuide?doc.splitTextToSize(rawTxt,icW-8):[];
+        let allLines;
+        if(useCFFRender){
+          const tmp=document.createElement('canvas').getContext('2d');
+          tmp.font=`${sp*0.65}px '${S.font.css}',sans-serif`;
+          allLines=showGuide?buildSegments(rawTxt,icW-8,s=>tmp.measureText(s).width):[];
+        } else {
+          allLines=showGuide?doc.splitTextToSize(rawTxt,icW-8):[];
+        }
         const tmpAvH=H-MB-framePad-82;
         const zonesPerPage=Math.max(1,Math.floor(tmpAvH/zoneH));
         const totalPages=Math.max(1,Math.ceil(Math.max(allLines.length,1)/zonesPerPage));
@@ -829,7 +894,14 @@ async function genPDF(){
           for(let zy=sy;zy+sp<sy+avH;zy+=zoneH){
             if(showGuide&&allLines.length>0){
               const seg=allLines[lineIdx%allLines.length];lineIdx++;
-              if(seg){doc.setFont(fn,fs);doc.setFontSize(sp*0.65);doc.setTextColor(...B(rc,pc,op));doc.text(seg,IML+2,zy+sp*0.75);}
+              if(seg){
+                if(useCFFRender){
+                  const[gr,gg,gb]=B(rc,pc,op);
+                  pdfCFFText(seg,sp*0.65,IML+2,zy+sp*0.75,icW-4,gr,gg,gb,op);
+                } else {
+                  doc.setFont(fn,fs);doc.setFontSize(sp*0.65);doc.setTextColor(...B(rc,pc,op));doc.text(seg,IML+2,zy+sp*0.75);
+                }
+              }
             }
             doc.setFillColor(...B(rc,pc,.5));
             for(let gy=zy+sp/2;gy<zy+zoneH&&gy<sy+avH;gy+=sp)
@@ -839,7 +911,6 @@ async function genPDF(){
       }
     }
 
-    // ── Draw all copies ──
     for(let c=0;c<copies;c++) drawOneCopy(c===0);
 
     const rawName=wtitle||rawTxt.slice(0,20);
@@ -854,7 +925,7 @@ async function genPDF(){
   }
 }
 ['iText','iTitle'].forEach(id=>document.getElementById(id).addEventListener('input',upd));
-['iOpacity','iFallback','iPaper','iCopies'].forEach(id=>document.getElementById(id).addEventListener('change',upd));
+['iOpacity','iFallback','iPaper','iCopies','iFontWeight','iFontStyle'].forEach(id=>document.getElementById(id).addEventListener('change',upd));
 const FRAME_PRESETS=[
   {h:'#8EC5BB',l:'Teal'},{h:'#F4A7B9',l:'Pink'},{h:'#B5A8D9',l:'Lavender'},
   {h:'#A8D5A2',l:'Sage'},{h:'#F9D78E',l:'Butter'},{h:'#F4B8A0',l:'Peach'},
@@ -871,7 +942,6 @@ function setFramePreset(h){
   upd();
 }
 window.addEventListener('resize',upd);
-// Re-draw after all fonts are ready (custom fonts may finish loading after first render)
 document.fonts.ready.then(()=>upd());
 
 initDGrid();initPaperPresets();initFramePresets();renderOpts();upd();
